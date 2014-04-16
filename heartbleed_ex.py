@@ -73,7 +73,7 @@ def hitHeartBeat(s,m):
 			return False
 		if typ == 24:
 			if len(pay) > 3:
-				print hexdump(pay)
+				hexdump(pay)
 				return True
 			else:
 				return False
