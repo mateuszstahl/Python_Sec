@@ -25,60 +25,60 @@ options.add_option('-p','--port',type='int',default=443,help='TCP port to test (
 #------------------------------------Func--------------------
 
 def hex2bin(x):
-	return x.replace(' ','').replace('\n','').decode('hex')
+    return x.replace(' ','').replace('\n','').decode('hex')
 
 def hexdump(s):
-	for x in range(0,len(s),16):
-		lin = [c for c in s[x:x+16]]
-		hexdata = ' '.join('%02X' % ord(c) for c in lin)
-		plaindata = ''.join((c if 32 <= ord(c) <= 126 else '.') for c in lin)
-		print '\t %04x: %-48s %s' % (x,hexdata,plaindata)
-	print
+    for x in range(0,len(s),16):
+        lin = [c for c in s[x:x+16]]
+        hexdata = ' '.join('%02X' % ord(c) for c in lin)
+        plaindata = ''.join((c if 32 <= ord(c) <= 126 else '.') for c in lin)
+        print '\t %04x: %-48s %s' % (x,hexdata,plaindata)
+    print
 
 def recvall(s,length, timeout=2):
-	endtime = time.time()+timeout
-	rdata = ''
-	remain = length
-	while remain > 0:
-		rtime = endtime - time.time()
-		if rtime < 0:
-			return None
-		r,w,e = select.select([s],[],[],5)
-		if s in r:
-			data = s.recv(remain)
-			if not data:
-				return None
-			rdata +=data
-			remain -=len(data)
-	return rdata
+    endtime = time.time()+timeout
+    rdata = ''
+    remain = length
+    while remain > 0:
+        rtime = endtime - time.time()
+        if rtime < 0:
+            return None
+        r,w,e = select.select([s],[],[],5)
+        if s in r:
+            data = s.recv(remain)
+            if not data:
+                return None
+            rdata +=data
+            remain -=len(data)
+    return rdata
 
 def recvmsg(s):
-	hexDataRecived = recvall(s,5)
-	if hexDataRecived is None:
-		print 'EOF recived (header) - server closed connection'
-		return None,None,None
-	typ,ver,ln = struct.unpack('>BHH',hexDataRecived)
-	pay = recvall(s,ln,10)
-	if pay is None:
-		print 'EOF recived (payload) - server closed connection'
-		return None,None,None
-	print '... recived message: type= %d, ver= %04x, len=%d' % (typ,ver,len(pay))
-	return typ,ver,pay
+    hexDataRecived = recvall(s,5)
+    if hexDataRecived is None:
+        print 'EOF recived (header) - server closed connection'
+        return None,None,None
+    typ,ver,ln = struct.unpack('>BHH',hexDataRecived)
+    pay = recvall(s,ln,10)
+    if pay is None:
+        print 'EOF recived (payload) - server closed connection'
+        return None,None,None
+    print '... recived message: type= %d, ver= %04x, len=%d' % (typ,ver,len(pay))
+    return typ,ver,pay
 
 def hitHeartBeat(s,m):
-	s.send(m)
-	while True:
-		typ,ver,pay = recvmsg(s)
-		if typ is None:
-			return False
-		if typ == 24:
-			if len(pay) > 3:
-				hexdump(pay)
-				return True
-			else:
-				return False
-		if typ == 21:
-			return False
+    s.send(m)
+    while True:
+        typ,ver,pay = recvmsg(s)
+        if typ is None:
+            return False
+        if typ == 24:
+            if len(pay) > 3:
+                hexdump(pay)
+                return True
+            else:
+                return False
+        if typ == 21:
+            return False
 
 #----------------------------------Messages-----------------
 
@@ -105,41 +105,41 @@ tls = {'0':'ssl3.0', '1':'tls1.0', '2':'tls1.1', '3':'tls1.2'}
 #--------------------------------Main-----------------------
 
 def main():
-	opts,args = options.parse_args()
-	if len(args) < 1:
-		options.print_help()
-		return
-	tries=[]
-	for t in tlsVer:
-		print tls[t] + ": ---------------------------------"
-		hello1 = hex2bin(hello[:7] + t + hello[8:])
-		hb1 = hex2bin(hb[:7] + t + hb[8:])
-		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		s.settimeout(1)
-		try:
-			print 'Connecting...'
-			s.connect((args[0],opts.port))
-		
-			print 'Sending Client Hello'
-			s.send(hello1)
-			
-			print 'Waiting for Server Hello...'
+    opts,args = options.parse_args()
+    if len(args) < 1:
+        options.print_help()
+        return
+    tries=[]
+    for t in tlsVer:
+        print tls[t] + ": ---------------------------------"
+        hello1 = hex2bin(hello[:7] + t + hello[8:])
+        hb1 = hex2bin(hb[:7] + t + hb[8:])
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(1)
+        try:
+            print 'Connecting...'
+            s.connect((args[0],opts.port))
+        
+            print 'Sending Client Hello'
+            s.send(hello1)
+            
+            print 'Waiting for Server Hello...'
 
-			while True:
-				typ,ver,pay = recvmsg(s)
-				if typ == None:
-					print 'Server closed - no handshake'
-					break
-				if typ == 22 and ord(pay[0]) == 0x0E:
-					print 'Sending Heartbeat request'
-					ch = hitHeartBeat(s,hb1)
-					if ch:
-						print '---InSecured'
-					else:
-					 	print '---Secured'
-					break
-		except socket.error as err:
-			print err
+            while True:
+                typ,ver,pay = recvmsg(s)
+                if typ == None:
+                    print 'Server closed - no handshake'
+                    break
+                if typ == 22 and ord(pay[0]) == 0x0E:
+                    print 'Sending Heartbeat request'
+                    ch = hitHeartBeat(s,hb1)
+                    if ch:
+                        print '---InSecured'
+                    else:
+                        print '---Secured'
+                    break
+        except socket.error as err:
+            print err
 
 if __name__ == "__main__":
-	main()
+    main()
